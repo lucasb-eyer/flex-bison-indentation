@@ -49,7 +49,7 @@ static const char* fg      = "\033[0;39m";
 %token TOK_INDENT
 %token TOK_OUTDENT
 
-%token TOK_STUFF
+%token TOK_STUFF TOK_REST
 
  /* %debug */
 
@@ -59,6 +59,8 @@ root:
 
 stuff:
      TOK_STUFF { std::cout << red << "stuff" << fg << std::endl; }
+     |
+     TOK_STUFF TOK_REST { std::cout << red << "stuff with rest" << fg << std::endl; }
      |
      TOK_INDENT { std::cout << green << "indent" << fg << std::endl; }
      |

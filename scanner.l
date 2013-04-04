@@ -40,12 +40,16 @@ extern const char* g_current_filename;
 /* Don't mangle yylex please! */
 #define YY_DECL extern "C" int yylex()
 #define YYSTYPE int
-#define YY_USER_INIT g_indent_levels.push(0);
+#define YY_USER_INIT { \
+        g_indent_levels.push(0); \
+        BEGIN(initial); \
+    }
 #include "parser.hh"
 
 %}
 
  /* This is a sub-parser (state) for indentation-sensitive scoping */
+%x initial
 %x indent
 %s normal
 
@@ -58,11 +62,18 @@ extern const char* g_current_filename;
  /* %option debug */
 %%
     int indent_caller = normal;
-    BEGIN(indent);
 
  /* This counts the current cursor position. */
 <*>.  { g_col++; REJECT; }
 <*>\n { g_col = 0; g_line++; REJECT; }
+
+ /* Everything runs in the <normal> mode and enters the <indent> mode
+    when a newline symbol is encountered.
+    There is no newline symbol before the first line, so we need to go
+    into the <indent> mode by hand there.
+ */
+<initial>.  { g_col--; indent_caller = normal; yyless(0); BEGIN(indent); }
+<initial>\n { g_line--; indent_caller = normal; yyless(0); BEGIN(indent); }
 
  /* The following are the rules that keep track of indentation. */
 <indent>" "     { g_current_line_indent++; }
@@ -80,6 +91,8 @@ extern const char* g_current_filename;
                             for(size_t i = 0 ; i < g_indent_levels.top() ; ++i) {
                                 unput(' ');
                             }
+                        } else {
+                            BEGIN(indent_caller);
                         }
 
                         return TOK_OUTDENT;
@@ -96,6 +109,7 @@ extern const char* g_current_filename;
                     // spaces this level has and emit an indentation token.
                     if(g_current_line_indent > g_indent_levels.top()) {
                         g_indent_levels.push(g_current_line_indent);
+                        BEGIN(indent_caller);
                         return TOK_INDENT;
                     } else if(g_current_line_indent < g_indent_levels.top()) {
                         // Outdenting is the most difficult, as we might need to
@@ -110,6 +124,8 @@ extern const char* g_current_filename;
                             for(size_t i = 0 ; i < g_indent_levels.top() ; ++i) {
                                 unput(' ');
                             }
+                        } else {
+                            BEGIN(indent_caller);
                         }
 
                         return TOK_OUTDENT;
@@ -119,8 +135,9 @@ extern const char* g_current_filename;
                     }
                 }
 
-<normal>\n    { g_current_line_indent = 0; indent_caller = normal; BEGIN(indent); }
+<normal>\n    { g_current_line_indent = 0; indent_caller = YY_START; BEGIN(indent); }
 <normal>stuff { return TOK_STUFF; }
+<normal>" ".+ { return TOK_REST; }
 
 (.|\n)  { std::cerr << g_current_filename << ":" << g_line << ":" << g_col << ": Unexpected character: " << yytext << std::endl; exit(1); }
 

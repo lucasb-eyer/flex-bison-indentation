@@ -28,11 +28,7 @@ IN THE SOFTWARE.
 int g_current_line_indent = 0;   /* indentation of the current line */
 std::stack<size_t> g_indent_levels;
 
-/* globals to track current cursor position */
-unsigned long g_line = 1;
-unsigned long g_col = 0;
-
-/* TODO: error on tabs/spaces mix? */
+/* TODO: error-out on tabs/spaces mix? */
 static const unsigned int TAB_WIDTH = 2;
 
 extern const char* g_current_filename;
@@ -40,11 +36,25 @@ extern const char* g_current_filename;
 /* Don't mangle yylex please! */
 #define YY_DECL extern "C" int yylex()
 #define YYSTYPE int
+#include "parser.hh"
+
 #define YY_USER_INIT { \
         g_indent_levels.push(0); \
         BEGIN(initial); \
     }
-#include "parser.hh"
+
+int yycolumn = 1;
+void set_yycolumn(int val) {
+    yycolumn = val;
+    yylloc.first_column = yycolumn;
+    yylloc.last_column = yycolumn + yyleng - 1;
+}
+
+#define YY_USER_ACTION { \
+    yylloc.first_line = yylloc.last_line = yylineno; \
+    set_yycolumn(yycolumn); \
+    yycolumn += yyleng; \
+}
 
 %}
 
@@ -59,21 +69,26 @@ extern const char* g_current_filename;
 %option yylineno
 %option noyywrap
 
- /* %option debug */
+ /*%option debug*/
 %%
     int indent_caller = normal;
 
- /* This counts the current cursor position. */
-<*>.  { g_col++; REJECT; }
-<*>\n { g_col = 0; g_line++; REJECT; }
+ /* This helps to keep track of the column number.
+  * Note that it won't work if you have a rule which includes a newline and is
+  * longer than one character because in that case that rule will be favored
+  * and this one here won't get called.
+  * TL;DR: If you have a rule which includes \n and more, you need to reset
+  *        yycolumn inside that rule!
+  */
+<*>\n { set_yycolumn(0); yylineno--; REJECT; }
 
  /* Everything runs in the <normal> mode and enters the <indent> mode
     when a newline symbol is encountered.
     There is no newline symbol before the first line, so we need to go
     into the <indent> mode by hand there.
  */
-<initial>.  { g_col--; indent_caller = normal; yyless(0); BEGIN(indent); }
-<initial>\n { g_line--; indent_caller = normal; yyless(0); BEGIN(indent); }
+<initial>.  { set_yycolumn(yycolumn-1); indent_caller = normal; yyless(0); BEGIN(indent); }
+<initial>\n { indent_caller = normal; yyless(0); BEGIN(indent); }
 
  /* The following are the rules that keep track of indentation. */
 <indent>" "     { g_current_line_indent++; }
@@ -103,6 +118,8 @@ extern const char* g_current_filename;
 
 <indent>.       {
                     unput(*yytext);
+                    // -2: -1 for putting it back and -1 for ending at the last space.
+                    set_yycolumn(yycolumn-1);
 
                     // Indentation level has increased. It can only ever
                     // increase by one level at a time. Remember how many
@@ -139,6 +156,6 @@ extern const char* g_current_filename;
 <normal>stuff { return TOK_STUFF; }
 <normal>" ".+ { return TOK_REST; }
 
-(.|\n)  { std::cerr << g_current_filename << ":" << g_line << ":" << g_col << ": Unexpected character: " << yytext << std::endl; exit(1); }
+(.|\n)  { std::cerr << g_current_filename << ":" << yylineno << ":" << yycolumn << ": Unexpected character: " << yytext << std::endl; exit(1); }
 
 %%

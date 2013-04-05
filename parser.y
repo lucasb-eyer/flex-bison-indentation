@@ -51,6 +51,8 @@ static const char* fg      = "\033[0;39m";
 
 %token TOK_STUFF TOK_REST
 
+%locations
+
  /* %debug */
 
 %%
@@ -58,13 +60,13 @@ root:
     root stuff | stuff ;
 
 stuff:
-     TOK_STUFF { std::cout << red << "stuff" << fg << std::endl; }
+     TOK_STUFF { std::cout << red << "stuff" << fg << "(" << @1.first_line << ":" << @1.first_column << "-" << @1.last_column << ")" << std::endl; }
      |
-     TOK_STUFF TOK_REST { std::cout << red << "stuff with rest" << fg << std::endl; }
+     TOK_STUFF TOK_REST { std::cout << red << "stuff" << fg << "(" << @1.first_line << ":" << @1.first_column << "-" << @1.last_column << ") " << red << "with rest" << fg << "(" << @2.first_line << ":" << @2.first_column << "-" << @2.last_column << ")" << std::endl; }
      |
-     TOK_INDENT { std::cout << green << "indent" << fg << std::endl; }
+     TOK_INDENT { std::cout << green << "indent" << fg << "(" << @1.first_line << ":" << @1.first_column << "-" << @1.last_column << ")" << std::endl; }
      |
-     TOK_OUTDENT { std::cout << green << "outdent" << fg << std::endl; }
+     TOK_OUTDENT { std::cout << green << "outdent" << fg << "(" << @1.first_line << ":" << @1.first_column << "-" << @1.last_column << ")" << std::endl; }
     ;
 
 %%
@@ -94,7 +96,7 @@ int main(int argc, char* argv[]) {
 }
 
 void yyerror(const char *s) {
-    std::cerr << g_current_filename << ":" << g_line << ":" << g_col << ": Parse error: " << s << std::endl;
+    std::cerr << g_current_filename << ":" << yylloc.first_line << ":" << yylloc.first_column << "-" << yylloc.last_column << ": Parse error: " << s << std::endl;
     exit(-1);  // Might as well halt now.
 }
 

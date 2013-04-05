@@ -118,7 +118,6 @@ void set_yycolumn(int val) {
 
 <indent>.       {
                     unput(*yytext);
-                    // -2: -1 for putting it back and -1 for ending at the last space.
                     set_yycolumn(yycolumn-1);
 
                     // Indentation level has increased. It can only ever

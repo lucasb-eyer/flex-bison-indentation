@@ -1,0 +1,5 @@
+stuff(1:1-5)
+indent(2:3-3)
+stuff(2:3-7)
+stuff(3:3-7) with rest(3:8-22)
+outdent(4:0-0)

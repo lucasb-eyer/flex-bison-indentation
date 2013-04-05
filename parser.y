@@ -31,8 +31,6 @@ extern "C" FILE *yyin;
 
 void yyerror(const char *s);
 
-extern "C" unsigned long g_line, g_col;
-
 static const char* black   = "\033[0;30m";
 static const char* red     = "\033[0;31m";
 static const char* green   = "\033[0;32m";

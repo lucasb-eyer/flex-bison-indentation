@@ -27,6 +27,7 @@ IN THE SOFTWARE.
 /* globals to track current indentation */
 int g_current_line_indent = 0;   /* indentation of the current line */
 std::stack<size_t> g_indent_levels;
+int g_is_fake_outdent_symbol = 0;
 
 /* TODO: error-out on tabs/spaces mix? */
 static const unsigned int TAB_WIDTH = 2;
@@ -117,8 +118,11 @@ void set_yycolumn(int val) {
                 }
 
 <indent>.       {
-                    unput(*yytext);
+                    if(!g_is_fake_outdent_symbol) {
+                        unput(*yytext);
+                    }
                     set_yycolumn(yycolumn-1);
+                    g_is_fake_outdent_symbol = 0;
 
                     // Indentation level has increased. It can only ever
                     // increase by one level at a time. Remember how many
@@ -136,10 +140,22 @@ void set_yycolumn(int val) {
                         g_indent_levels.pop();
 
                         if(g_current_line_indent != g_indent_levels.top()) {
+                            // Unput the rest of the current line, including the newline.
+                            // We want to keep it untouched.
+                            for(size_t i = 0 ; i < g_current_line_indent ; ++i) {
+                                unput(' ');
+                            }
                             unput('\n');
+                            // Now, insert a fake character indented just so
+                            // that we get a correct outdent the next time.
+                            unput('.');
+                            // Though we need to remember that it's a fake one
+                            // so we can ignore the symbol.
+                            g_is_fake_outdent_symbol = 1;
                             for(size_t i = 0 ; i < g_indent_levels.top() ; ++i) {
                                 unput(' ');
                             }
+                            unput('\n');
                         } else {
                             BEGIN(indent_caller);
                         }

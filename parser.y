@@ -73,7 +73,9 @@ const char* g_current_filename = "stdin";
 
 int main(int argc, char* argv[]) {
     yyin = stdin;
-    // yydebug = 1;
+#if YYDEBUG
+    yydebug = 1;
+#endif
 
     if(argc == 2) {
         yyin = fopen(argv[1], "r");
